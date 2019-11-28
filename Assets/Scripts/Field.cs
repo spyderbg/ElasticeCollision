@@ -165,7 +165,7 @@ namespace Spheres
             Debug.Log($"compIntersect: {compIntersect} compensateCount: {compensateCount}");
 
             // update instanced buffers
-//            UpdateBuffers();
+            UpdateBuffers();
             Debug.Log($"Randomize spheres duration {Time.realtimeSinceStartup - startTime}");
 
 //            PrintIntersections();
@@ -237,8 +237,8 @@ namespace Spheres
         {
 //            DrawSpheresMono();
 //            DrawSpheresMesh();
-            DrawSpheresByBuckets();
-//            DrawSpheresIndirect();
+//            DrawSpheresByBuckets();
+            DrawSpheresIndirect();
         }
 
         public void ClearSpheresMono()
@@ -309,7 +309,7 @@ namespace Spheres
         {
             if( _spheres == null ) return;
 
-            Graphics.DrawMeshInstancedIndirect(InstanceMesh, 0, InstanceMaterial, new UnityEngine.Bounds(Vector3.zero, new Vector3(100.0f, 100.0f, 100.0f)), _argsBuffer);
+            Graphics.DrawMeshInstancedIndirect(InstanceMesh, 0, InstanceMaterial, new UnityEngine.Bounds(Vector3.zero, new Vector3(10.0f, 10.0f, 10.0f)), _argsBuffer);
         }
 
         private void UpdateBuffers()
@@ -328,7 +328,7 @@ namespace Spheres
             for( var i = 0; i < _cachedInstanceCount; i++ )
             {
                 var sphere = _spheres[i];
-                positions[i] = new Vector4(sphere.Center.x, sphere.Center.y, sphere.Center.z, sphere.Radius);
+                positions[i] = new Vector4(sphere.Center.x, sphere.Center.y, sphere.Center.z, 2.0f * sphere.Radius);
             }
             _positionBuffer.SetData( positions );
             InstanceMaterial.SetBuffer("positionBuffer", _positionBuffer);
@@ -345,7 +345,6 @@ namespace Spheres
             }
             _argsBuffer.SetData(args);
         }
-
 
         #endregion
 
