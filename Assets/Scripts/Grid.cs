@@ -1,11 +1,7 @@
-﻿using System;
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using System.Xml;
-using Common;
-using UnityEditor.UI;
 using UnityEngine;
 
 namespace Spheres
@@ -54,14 +50,14 @@ namespace Spheres
             if( handles != null )
             {
                 foreach (var h in handles)
-                    h.Set();
+                    h?.Set();
                 handles = null;
             }
 
             if( aHandles != null )
             {
                 foreach (var h in aHandles)
-                    h.Set();
+                    h?.Set();
                 aHandles = null;
             }
         }

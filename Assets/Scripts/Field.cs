@@ -1,14 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data.SqlTypes;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Threading;
-using System.Threading.Tasks;
-using System.Xml;
-using Bolt;
-using Ludiq.FullSerializer;
-using MiscUtil.Collections;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -18,7 +11,7 @@ namespace Spheres
     public class Field : MonoBehaviour
     {
         public GameObject Grid;
-        public GameObject Spheres; // manual alignment
+        public GameObject Spheres; 
         public int SphereNumbers;
         private IList<Sphere> _spheres;
 

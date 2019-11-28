@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using Spheres;
+﻿using Spheres;
 using UnityEngine;
 
 public class GameplayGUI : MonoBehaviour
