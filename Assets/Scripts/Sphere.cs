@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 
 namespace Spheres
 {
@@ -12,6 +13,7 @@ namespace Spheres
             Center = center;
             Radius = radius;
             Velocity = velocity;
+            Collisions = new List<Sphere>();
         }
 
         #endregion
@@ -42,6 +44,8 @@ namespace Spheres
         public float Radius2 { get; private set; }
 
         public Vector3 Velocity;
+
+        public IList<Sphere> Collisions;
 
         #endregion
 

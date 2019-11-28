@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using UnityEngine;
+using UnityEngine.SocialPlatforms;
 using Random = UnityEngine.Random;
 
 namespace Spheres
@@ -37,7 +38,7 @@ namespace Spheres
 
         void Update()
         {
-            UpdatePositions();
+//            Simulate(Time.deltaTime);
             Draw();
         }
 
@@ -237,8 +238,8 @@ namespace Spheres
         {
 //            DrawSpheresMono();
 //            DrawSpheresMesh();
-//            DrawSpheresByBuckets();
-            DrawSpheresIndirect();
+            DrawSpheresByBuckets();
+//            DrawSpheresIndirect();
         }
 
         public void ClearSpheresMono()
@@ -285,22 +286,27 @@ namespace Spheres
 
         public void DrawSpheresByBuckets()
         {
-//            var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-//            var mesh = go.GetComponent<MeshFilter>().sharedMesh;
-//            var material = go.GetComponent<Renderer>().sharedMaterial; material.color = Color.red;
-//            DestroyImmediate(go);
-            
             var grid = Grid.GetComponent<Grid>();
-            for (var i = 0; i < grid.Rows * grid.Height; i++)
+            for (var i = 0; i < grid.Rows * grid.Columns; i++)
             {
-                if(!(grid._buckets[i] is IList<Sphere> bucket)) continue;
-                
-                foreach( var sphere in bucket ) 
-                {
-                    var matrix = Matrix4x4.Translate(sphere.Center) *
-                                 Matrix4x4.Scale(new Vector3(2.0f * sphere.Radius, 2.0f * sphere.Radius, 2.0f * sphere.Radius));
+                if(!(grid._buckets[i] is List<Sphere> bucket)) continue;
 
-                    Graphics.DrawMesh( InstanceMesh, matrix, InstanceMaterial, 0 );
+                lock (bucket)
+                {
+                    foreach( var sphere in bucket ) 
+                    {
+                        //Debug.Log($"sphere({sphere.Center.x}, {sphere.Center.y}, {sphere.Center.z})");
+                        var matrix = Matrix4x4.Translate(sphere.Center) *
+                                     Matrix4x4.Scale(new Vector3(2.0f * sphere.Radius, 2.0f * sphere.Radius, 2.0f * sphere.Radius));
+                        try
+                        {
+                            Graphics.DrawMesh(InstanceMesh, matrix, InstanceMaterial, 0);
+                        }
+                        catch(Exception e)
+                        {
+                           Debug.Log($"Exception: {e}"); 
+                        }
+                    }
                 }
             }
         }
@@ -350,20 +356,30 @@ namespace Spheres
 
         #region Movement methods
 
-        private void UpdatePositions()
+        private void Simulate(float deltaTime)
         {
             if( _spheres == null ) return;
+            
+            var grid = Grid.GetComponent<Grid>();
+            
+            UpdatePositions(deltaTime);
+//            grid.UpdatePositions(deltaTime);
+            
+            UpdateBuffers();
+        }
+        
+        private void UpdatePositions(float deltaTime)
+        {
+            var grid = Grid.GetComponent<Grid>();
 
-            var grid1 = Grid.GetComponent<Grid>();
-
-            var collisions = new List<Tuple<Sphere, Sphere>>();
-
+//            var collisions = new List<Tuple<Sphere, Sphere>>();
+/*
             for (var i = 0; i < _spheres.Count; i++)
             {
                 var si = _spheres[i];
                 var ci = si.Center;
 
-                ci += si.Velocity * Time.deltaTime;
+                ci += si.Velocity * deltaTime;
 
                 // boundary
                 if (ci.x - si.Radius < 0)
@@ -371,20 +387,20 @@ namespace Spheres
                     si.Velocity.x *= -1;
                     ci.x = si.Radius;
                 }
-                else if (ci.x + si.Radius > grid1.Width)
+                else if (ci.x + si.Radius > grid.Width)
                 {
                     si.Velocity.x *= -1;
-                    ci.x = grid1.Width - si.Radius;
+                    ci.x = grid.Width - si.Radius;
                 }
                 if (ci.y - si.Radius < 0)
                 {
                     si.Velocity.y *= -1;
                     ci.y = si.Radius;
                 }
-                else if (ci.y + si.Radius > grid1.Height)
+                else if (ci.y + si.Radius > grid.Height)
                 {
                     si.Velocity.y *= -1;
-                    ci.y = grid1.Height - si.Radius;
+                    ci.y = grid.Height - si.Radius;
                 }
 
                 // collision
@@ -395,7 +411,8 @@ namespace Spheres
 
                     if (si.IsIntersect(sj))
                     {
-                        collisions.Add( new Tuple<Sphere, Sphere>(si, sj) );
+//                        collisions.Add( new Tuple<Sphere, Sphere>(si, sj) );
+                        si.Collisions.Add(sj);
 
                         var d = si.Distance( sj );
                         var overlap = 0.5f * (d - si.Radius - sj.Radius) / d;
@@ -409,19 +426,21 @@ namespace Spheres
 
                 si.Center = ci;
             }
+            */
             
             // update collided circles velocity
             // ref: https://en.wikipedia.org/wiki/Elastic_collision
-            foreach(var pair in collisions)
-            {
-                var s1 = pair.Item1;
-                var s2 = pair.Item2;
+            
+//            foreach(var pair in collisions)
+//            {
+//                var s1 = pair.Item1;
+//                var s2 = pair.Item2;
 
-                var n = (s2.Center - s1.Center).normalized;
-                var dot = Vector3.Dot(s1.Velocity - s2.Velocity, n);
-                var k = 2.0f * dot / (s1.Radius + s2.Radius);
-                s1.Velocity -= k * s2.Radius * n;
-                s2.Velocity += k * s1.Radius * n;
+//                var n = (s2.Center - s1.Center).normalized;
+//                var dot = Vector3.Dot(s1.Velocity - s2.Velocity, n);
+//                var k = 2.0f * dot / (s1.Radius + s2.Radius);
+//                s1.Velocity -= k * s2.Radius * n;
+//                s2.Velocity += k * s1.Radius * n;
 
 //                var d12 = (s1.Center - s2.Center).normalized;
 //                var d21 = (s2.Center - s1.Center).normalized;
@@ -431,9 +450,14 @@ namespace Spheres
 
 //                s1.Velocity -=  k * s2.Radius * dot1 * d12;
 //                s2.Velocity += k * s1.Radius * dot2 * d12;
-            }
+//            }
 
-            UpdateBuffers();
+            for (var c = 0; c < grid.Columns; c++)
+                grid.CollisionsWorker(c);
+                
+            grid.VelocityUpdateWorker(new Range(0, grid.Rows * grid.Columns));
+
+            grid.BucketUpdateWorker(new Range(0, grid.Rows * grid.Columns));
         }
 
         #endregion

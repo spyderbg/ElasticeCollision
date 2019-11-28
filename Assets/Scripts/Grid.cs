@@ -1,8 +1,10 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using UnityEngine;
+using UnityEngine.SocialPlatforms;
 
 namespace Spheres
 {
@@ -22,9 +24,28 @@ namespace Spheres
 
         private readonly int ThreadsNum = 4;
         private ManualResetEvent[] handles;
-        private AutoResetEvent[] aHandles;
+        private ManualResetEvent _critical;
 
+        private Thread _physicsThread;
+        private bool _isEnabled;
+
+        private float _deltaTime;
+        
         #region Overwrite methods
+
+        private void Awake()
+        {
+            _critical = new ManualResetEvent(false);
+            
+            handles = new ManualResetEvent[ThreadsNum];
+            for(var i = 0; i < ThreadsNum; i++)
+                handles[i] = new ManualResetEvent(false);
+        }
+
+        void Update()
+        {
+            Interlocked.Exchange(ref _deltaTime, Time.deltaTime);
+        }
 
         void OnDrawGizmos()
         {
@@ -41,25 +62,23 @@ namespace Spheres
 
         void OnEnable()
         {
-            handles = new ManualResetEvent[ThreadsNum];
-            aHandles = new AutoResetEvent[ThreadsNum];
+            _isEnabled = true;
+            
+            _physicsThread = new Thread(UpdateWorker);
+            _physicsThread.Start();
         }
 
         void OnDisable()
         {
-            if( handles != null )
-            {
-                foreach (var h in handles)
-                    h?.Set();
-                handles = null;
-            }
-
-            if( aHandles != null )
-            {
-                foreach (var h in aHandles)
-                    h?.Set();
-                aHandles = null;
-            }
+            _isEnabled = false;
+            
+            foreach (var h in handles)
+                h?.Set();
+                
+            _physicsThread.Abort();
+            Thread.Sleep(50);
+            
+            handles = null;
         }
 
         #endregion
@@ -146,12 +165,55 @@ namespace Spheres
         {
             if( x < 0 || Columns <= x || y < 0 || Rows <= y || z < 0 ) 
                 return;
-
-            var bucket = _buckets[GetHash(x, y)];
-
-//             bucket != null
-//                   && ((IList<Sphere>)bucket).Any(sphere.IsIntersect);
+                
+            var bucket = _buckets[GetHash(x, y)] as IList<Sphere>;
+            if (bucket == null || bucket.Count == 0) return;
             
+            var si = sphere;
+            var ci = si.Center;
+            
+            si.Collisions.Clear();
+
+            ci += si.Velocity * _deltaTime;
+
+            // boundary
+            if (ci.x - si.Radius < 0) {
+                si.Velocity.x *= -1;
+                ci.x = si.Radius;
+            } else if (ci.x + si.Radius > Width) {
+                si.Velocity.x *= -1;
+                ci.x = Width - si.Radius;
+            } if (ci.y - si.Radius < 0) {
+                si.Velocity.y *= -1;
+                ci.y = si.Radius;
+            } else if (ci.y + si.Radius > Height) {
+                si.Velocity.y *= -1;
+                ci.y = Height - si.Radius;
+            }
+
+            // collision
+//            for( var j = 0; j < bucket.Count; j++ )
+//            {
+//                var sj = bucket[j];
+//                var cj = sj.Center;
+//                
+//                if(si == sj) continue;
+//
+//                if (si.IsIntersect(sj))
+//                {
+//                    si.Collisions.Add(sj);
+//
+//                    var d = si.Distance( sj );
+//                    var overlap = 0.5f * (d - si.Radius - sj.Radius) / d;
+//
+//                    ci -= overlap * (ci - cj);
+//                    cj += overlap * (ci - cj);
+//                }
+//
+//                sj.Center = cj;
+//            }
+
+            si.Center = ci;
         }
         
         public void ClearBuckets()
@@ -169,28 +231,64 @@ namespace Spheres
                 _buckets[key] = bucket;
             }
 
-            ((IList<Sphere>)bucket).Add(sphere);
+            lock(bucket)
+                ((IList<Sphere>)bucket).Add(sphere);
+        }
+
+        public void RemoveSphere(Sphere sphere)
+        {
+            // ...
         }
 
         public void UpdatePositions()
         {
+            Debug.Log("UpdatePositions");
+            
             var columnsPerThread = Columns / ThreadsNum;
 
+            // found all collisions
             for (var i = 0; i <= columnsPerThread; i++)
             {
                 for (var t = 0; t < ThreadsNum; t++)
                 {
                     var c = i * columnsPerThread + t;
-                    if( c < Columns )
-                    {
-                        // thread 't' updates column 'c'
-                        ThreadPool.QueueUserWorkItem( Worker, c );
-                    }
+                    if (c >= Columns) continue;
+                    
+                    handles[t].Reset();
+                    ThreadPool.QueueUserWorkItem( CollisionsWorker, new Tuple<int, int>(t, c) );
+//                  CollisionsWorker( c );
                 }
 
-                // wait all threads
-                WaitHandle.WaitAll( aHandles );
+                WaitHandle.WaitAll( handles );
             }
+            
+            // update collided spheres velocity
+            var cellsPerThread = Rows * Columns / ThreadsNum;
+            var startCell = 0;
+//            for (var t = 0; t < ThreadsNum - 1; t++)
+//            {
+//                ThreadPool.QueueUserWorkItem( VelocityUpdateWorker, new Range(startCell, cellsPerThread ));
+//                startCell += cellsPerThread;
+//            }
+//            ThreadPool.QueueUserWorkItem( VelocityUpdateWorker, new Range( startCell, Rows * Columns - startCell + 1) );
+//             VelocityUpdateWorker(new Range( 0, Rows * Columns) );
+            
+//            WaitHandle.WaitAll( handles );
+            
+            // update buckets
+            startCell = 0;
+            foreach (var handle in handles)
+                handle.Reset();
+            for (var t = 0; t < ThreadsNum - 1; t++)
+            {
+                ThreadPool.QueueUserWorkItem( BucketUpdateWorker, new Tuple<int, Range>(t, new Range(startCell, cellsPerThread )));
+                startCell += cellsPerThread;
+            }
+            ThreadPool.QueueUserWorkItem( BucketUpdateWorker, new Tuple<int, Range>(ThreadsNum - 1, new Range( startCell, Rows * Columns - startCell + 1)));
+
+//            BucketUpdateWorker( new Range( 0, Rows * Columns) );
+            
+            WaitHandle.WaitAll( handles );
         }
 
         #endregion
@@ -206,14 +304,46 @@ namespace Spheres
         private int GetHash(Vector3 position)
             => GetHash((int)(position.x % Columns), (int)(position.y % Rows), 0);
 
-        private void Worker(object column)
+        private int GetHash(Sphere sphere)
+            => GetHash(sphere.Center);
+
+
+        private void UpdateWorker(object data)
+        {
+            while (_isEnabled)
+            {
+                Debug.Log("Thread udpate...");
+                try
+                {
+                    UpdatePositions();
+                }
+                catch (ThreadInterruptedException)
+                {
+                    Debug.Log("Thread udpate...ThreadInterruptedException");
+                }
+                catch (ThreadAbortException)
+                {
+                    Debug.Log("Thread udpate...ThreadAbortException");
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                }
+
+                Thread.Sleep(100);
+            }
+
+            Debug.Log($"UpdateWorker finished");
+        }
+
+        public void CollisionsWorker(object data)
         {
             const short xr = 0b011011011;
             const short xl = 0b110110110;
             const short yt = 0b111111000;
             const short yb = 0b000111111;
 
-            var x = (int)column;
+            var (threadId, x) = (Tuple<int, int>) data;
 
             for( var y = 0; y < Rows; y++ )
             {
@@ -226,23 +356,75 @@ namespace Spheres
                     var mask = (sphere.Velocity.x < 0 ? xl : xr) & (sphere.Velocity.y < 0 ? yb : yt);
 
                     UpdateCollisions(sphere, x, y);
-                    if((mask & 1 << 8) == 0) UpdateCollisions(sphere, x - 1, y + 1, 0);
-                    if((mask & 1 << 7) == 0) UpdateCollisions(sphere, x, y + 1, 0);
-                    if((mask & 1 << 6) == 0) UpdateCollisions(sphere, x + 1, y + 1, 0);
-                    if((mask & 1 << 5) == 0) UpdateCollisions(sphere, x - 1, y, 0);
-                    if((mask & 1 << 3) == 0) UpdateCollisions(sphere, x + 1, y, 0);
-                    if((mask & 1 << 2) == 0) UpdateCollisions(sphere, x - 1, y - 1, 0);
-                    if((mask & 1 << 1) == 0) UpdateCollisions(sphere, x, y - 1, 0);
-                    if((mask & 1) == 0) UpdateCollisions(sphere, x + 1, y - 1, 0);
+                    /*if((mask & 1 << 8) == 0)*/ //UpdateCollisions(sphere, x - 1, y + 1, 0);
+                    /*if((mask & 1 << 7) == 0)*/ //UpdateCollisions(sphere, x, y + 1, 0);
+                    /*if((mask & 1 << 6) == 0)*/ //UpdateCollisions(sphere, x + 1, y + 1, 0);
+                    /*if((mask & 1 << 5) == 0)*/ //UpdateCollisions(sphere, x - 1, y, 0);
+                    /*if((mask & 1 << 3) == 0)*/ //UpdateCollisions(sphere, x + 1, y, 0);
+                    /*if((mask & 1 << 2) == 0)*/ //UpdateCollisions(sphere, x - 1, y - 1, 0);
+                    /*if((mask & 1 << 1) == 0)*/ //UpdateCollisions(sphere, x, y - 1, 0);
+                    /*if((mask & 1) == 0)*/      //UpdateCollisions(sphere, x + 1, y - 1, 0);
                 }
             }
 
-
-
-
-
+            handles[threadId].Set();
         }
 
+        public void VelocityUpdateWorker(object data)
+        {
+            var (threadId, range) = (Tuple<int, Range>) data;
+            var startCell = range.@from;
+            var endCell = startCell + range.count;
+
+            for (var c = startCell; c < endCell; c++)
+            {
+                if(!(_buckets[c] is List<Sphere> bucket)) continue;
+
+                foreach (var sphere in bucket)
+                {
+                    // update velocity
+                    if(!sphere.Collisions.Any()) continue;
+
+                    var s1 = sphere;
+                    var s2 = sphere.Collisions.OrderBy(s => sphere.Distance(s)).First();
+
+                    var n = (s2.Center - s1.Center).normalized;
+                    var dot = Vector3.Dot(s1.Velocity - s2.Velocity, n);
+                    var k = 2.0f * dot / (s1.Radius + s2.Radius);
+                    s1.Velocity -= k * s2.Radius * n;
+                    s2.Velocity += k * s1.Radius * n;
+                }
+            }
+            
+            handles[threadId].Set();
+        }
+        
+        public void BucketUpdateWorker(object data)
+        {
+            var (threadId, range) = (Tuple<int, Range>) data;
+            var startCell = range.@from;
+            var endCell = startCell + range.count;
+
+            for (var c = startCell; c < endCell; c++)
+            {
+                if(!(_buckets[c] is List<Sphere> bucket)) continue;
+
+                foreach (var s in bucket)
+                    s.Collisions.Clear();
+                
+                lock (bucket)
+                {
+                    Debug.Log($"Change sphere bucket: {c}");
+                    
+                    foreach (var s in bucket.Where(s => c != GetHash(s)))
+                        AddSphere(s);
+                    bucket.RemoveAll(s => c != GetHash(s));
+                }
+            }
+            
+            handles[threadId].Set();
+        }
+        
         #endregion
     }
 

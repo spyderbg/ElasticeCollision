@@ -386,9 +386,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   Grid: {fileID: 2044913230}
   Spheres: {fileID: 1448406137}
-  SphereNumbers: 50
-  MinRadius: 0.2
-  MaxRadius: 0.5
+  SphereNumbers: 10
+  MinRadius: 1.2
+  MaxRadius: 1.5
   MinVelocity: 0.5
   MaxVelocity: 0.9
   InstanceMesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
@@ -439,5 +439,5 @@ MonoBehaviour:
   DrawGrid: 1
   Width: 10
   Height: 10
-  Rows: 10
-  Columns: 10
+  Rows: 4
+  Columns: 4
