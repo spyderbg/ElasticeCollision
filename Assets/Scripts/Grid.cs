@@ -30,6 +30,8 @@ namespace Spheres
         private bool _isEnabled;
 
         private float _deltaTime;
+
+        private GameplayGUI _gameplayGui;
         
         #region Overwrite methods
 
@@ -42,9 +44,13 @@ namespace Spheres
                 handles[i] = new ManualResetEvent(false);
         }
 
+        void Start()
+        {
+            _gameplayGui = FindObjectOfType<GameplayGUI>();
+        }
         void Update()
         {
-            Interlocked.Exchange(ref _deltaTime, Time.deltaTime);
+            Interlocked.Exchange(ref _deltaTime,  _gameplayGui.Speed * Time.deltaTime);
         }
 
         void OnDrawGizmos()
