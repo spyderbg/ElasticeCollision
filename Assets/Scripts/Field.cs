@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using Microsoft.Win32.SafeHandles;
 using UnityEngine;
 using UnityEngine.SocialPlatforms;
 using Random = UnityEngine.Random;
@@ -370,34 +371,15 @@ namespace Spheres
         
         private void UpdatePositions(float deltaTime)
         {
+            deltaTime = .20f;
             var grid = Grid.GetComponent<Grid>();
 
-//            var collisions = new List<Tuple<Sphere, Sphere>>();
+            var collisions = new List<Tuple<Sphere, Sphere>>();
             for (var i = 0; i < _spheres.Count; i++)
             {
                 var si = _spheres[i];
                 var ci = si.Center;
-
-                ci += si.Velocity * deltaTime;
-
-                // boundary
-                if (ci.x - si.Radius < 0) {
-                    si.Velocity.x *= -1;
-                    ci.x = si.Radius;
-                }
-                else if (ci.x + si.Radius > grid.Width) {
-                    si.Velocity.x *= -1;
-                    ci.x = grid.Width - si.Radius;
-                }
-                if (ci.y - si.Radius < 0) {
-                    si.Velocity.y *= -1;
-                    ci.y = si.Radius;
-                }
-                else if (ci.y + si.Radius > grid.Height) {
-                    si.Velocity.y *= -1;
-                    ci.y = grid.Height - si.Radius;
-                }
-
+                var vi = si.Velocity * deltaTime;
                 // collision
 //                for( var j = 0; j < i; j++ )
 //                {
@@ -419,15 +401,53 @@ namespace Spheres
 //                    sj.Center = cj;
 //                }
 
-                for( var j = 0; j < i; j++ )
+                for( var j = 0; j < _spheres.Count; j++ )
                 {
                     var sj = _spheres[j];
                     var cj = sj.Center;
+                    var vj = sj.Velocity * deltaTime;
+                    
+                    if(si == sj) continue;
 
-                    if( si.IsIntersectTime( sj ) )
+                    // prevent overlapping
+                    if (si.IsIntersect(sj))
                     {
+                        var d = si.Distance( sj );
+                        var overlap = 0.5f * (d - si.Radius - sj.Radius) / d;
 
+                        ci -= overlap * (ci - cj);
+                        cj += overlap * (ci - cj);
                     }
+
+                    // find time ot collision
+                    var t = si.IntersectTime(sj, deltaTime);
+                    if(0.0f <= t && t <= 1.0f)
+                    {
+                        ci += t * vi;
+                        cj += t * vj;
+                        
+                        collisions.Add( new Tuple<Sphere, Sphere>(si, sj) );
+                    } else {
+                        ci += vi;
+
+                        if (ci.x - si.Radius < 0) {
+                            si.Velocity.x *= -1;
+                            ci.x = si.Radius;
+                        } else if (ci.x + si.Radius > grid.Width) {
+                            si.Velocity.x *= -1;
+                            ci.x = grid.Width - si.Radius;
+                        }
+
+                        if (ci.y - si.Radius < 0) {
+                            si.Velocity.y *= -1;
+                            ci.y = si.Radius;
+                        } else if (ci.y + si.Radius > grid.Height) {
+                            si.Velocity.y *= -1;
+                            ci.y = grid.Height - si.Radius;
+                        }
+                    }
+
+                    sj.Center = cj;
                 }
                 
                 si.Center = ci;
@@ -436,14 +456,13 @@ namespace Spheres
             // update collided circles velocity
             // ref: https://en.wikipedia.org/wiki/Elastic_collision
             
-//            foreach(var pair in collisions)
-//            {
-//                var s1 = pair.Item1;
-//                var s2 = pair.Item2;
+            foreach(var pair in collisions)
+            {
+                var (s1, s2) = (Tuple<Sphere, Sphere>) pair;
 
-//                var n = (s2.Center - s1.Center).normalized;
-//                var dot = Vector3.Dot(s1.Velocity - s2.Velocity, n);
-//                var k = 2.0f * dot / (s1.Radius + s2.Radius);
+                var n = (s2.Center - s1.Center).normalized;
+                var dot = Vector3.Dot(s1.Velocity - s2.Velocity, n);
+                var k = 2.0f * dot / (s1.Radius + s2.Radius);
 //                s1.Velocity -= k * s2.Radius * n;
 //                s2.Velocity += k * s1.Radius * n;
 
@@ -455,7 +474,7 @@ namespace Spheres
 
 //                s1.Velocity -=  k * s2.Radius * dot1 * d12;
 //                s2.Velocity += k * s1.Radius * dot2 * d12;
-//            }
+            }
 
 //            for (var c = 0; c < grid.Columns; c++)
 //                grid.CollisionsWorker(c);

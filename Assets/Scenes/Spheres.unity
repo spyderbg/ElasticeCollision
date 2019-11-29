@@ -387,7 +387,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   Grid: {fileID: 2044913230}
   Spheres: {fileID: 1448406137}
-  SphereNumbers: 10
+  SphereNumbers: 2
   MinRadius: 1.2
   MaxRadius: 1.5
   MinVelocity: 0.5

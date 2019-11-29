@@ -1,4 +1,6 @@
 ﻿using System.Collections.Generic;
+using System.Security.Cryptography.X509Certificates;
+using UnityEditor.VersionControl;
 using UnityEngine;
 
 namespace Spheres
@@ -57,15 +59,37 @@ namespace Spheres
         public bool IsIntersect( Sphere c ) =>
              Distance2(c) <= Mathf.Pow( c.Radius + Radius, 2.0f );
 
-        public bool IsIntersectTime( Sphere c )
+        public bool IsIntersectTime( Sphere c, float deltaTime )
         {
             var a = Center - c.Center;
-            var b = Velocity - c.Velocity;
+            var a2 = a.x * a.x + a.y * a.y;
+            var b = (Velocity - c.Velocity) * deltaTime;
+            var b2 = b.x * b.x + b.y * b.y;
             var ab = Vector3.Dot( a, b );
-            var d2 = (a.x * a.x + a.y * a.y) - ab * ab / (b.x * b.x + b.y * b.y);
-            return d2 <= (Radius + c.Radius) * (Radius * c.Radius);
+            var ab2 = ab * ab;
+            var d2 = a2 - ab2 / b2;
+            var dist = Radius + c.Radius;
+            var dist2 = dist * dist;
+        
+            return d2 <= dist2;
         }
 
+        public float IntersectTime(Sphere c, float deltaTime)
+        {
+            var a = Center - c.Center;
+            var a2 = a.x * a.x + a.y * a.y;
+            var b = (Velocity - c.Velocity) * deltaTime;
+            var b2 = b.x * b.x + b.y * b.y;
+            var ab = Vector3.Dot( a, b );
+            var ab2 = ab * ab;
+            var d2 = a2 - ab2 / b2;
+            var dist = Radius + c.Radius;
+            var dist2 = dist * dist;
+
+            if (d2 > dist2) return -1.0f;
+
+            return (-ab - Mathf.Sqrt(ab2 - b2 * (a2 - d2))) / b2;
+        }
 
         public float Distance( Sphere c ) =>
             Mathf.Sqrt(Mathf.Pow( c.Center.x - Center.x, 2.0f ) + Mathf.Pow( c.Center.y - Center.y, 2.0f ));
