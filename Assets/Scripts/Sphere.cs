@@ -57,6 +57,16 @@ namespace Spheres
         public bool IsIntersect( Sphere c ) =>
              Distance2(c) <= Mathf.Pow( c.Radius + Radius, 2.0f );
 
+        public bool IsIntersectTime( Sphere c )
+        {
+            var a = Center - c.Center;
+            var b = Velocity - c.Velocity;
+            var ab = Vector3.Dot( a, b );
+            var d2 = (a.x * a.x + a.y * a.y) - ab * ab / (b.x * b.x + b.y * b.y);
+            return d2 <= (Radius + c.Radius) * (Radius * c.Radius);
+        }
+
+
         public float Distance( Sphere c ) =>
             Mathf.Sqrt(Mathf.Pow( c.Center.x - Center.x, 2.0f ) + Mathf.Pow( c.Center.y - Center.y, 2.0f ));
 

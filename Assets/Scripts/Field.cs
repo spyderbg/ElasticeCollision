@@ -38,7 +38,7 @@ namespace Spheres
 
         void Update()
         {
-//            Simulate(Time.deltaTime);
+            Simulate(Time.deltaTime);
             Draw();
         }
 
@@ -373,7 +373,6 @@ namespace Spheres
             var grid = Grid.GetComponent<Grid>();
 
 //            var collisions = new List<Tuple<Sphere, Sphere>>();
-/*
             for (var i = 0; i < _spheres.Count; i++)
             {
                 var si = _spheres[i];
@@ -382,51 +381,57 @@ namespace Spheres
                 ci += si.Velocity * deltaTime;
 
                 // boundary
-                if (ci.x - si.Radius < 0)
-                {
+                if (ci.x - si.Radius < 0) {
                     si.Velocity.x *= -1;
                     ci.x = si.Radius;
                 }
-                else if (ci.x + si.Radius > grid.Width)
-                {
+                else if (ci.x + si.Radius > grid.Width) {
                     si.Velocity.x *= -1;
                     ci.x = grid.Width - si.Radius;
                 }
-                if (ci.y - si.Radius < 0)
-                {
+                if (ci.y - si.Radius < 0) {
                     si.Velocity.y *= -1;
                     ci.y = si.Radius;
                 }
-                else if (ci.y + si.Radius > grid.Height)
-                {
+                else if (ci.y + si.Radius > grid.Height) {
                     si.Velocity.y *= -1;
                     ci.y = grid.Height - si.Radius;
                 }
 
                 // collision
+//                for( var j = 0; j < i; j++ )
+//                {
+//                    var sj = _spheres[j];
+//                    var cj = sj.Center;
+//
+//                    if (si.IsIntersect(sj))
+//                    {
+////                        collisions.Add( new Tuple<Sphere, Sphere>(si, sj) );
+//                        si.Collisions.Add(sj);
+//
+//                        var d = si.Distance( sj );
+//                        var overlap = 0.5f * (d - si.Radius - sj.Radius) / d;
+//
+//                        ci -= overlap * (ci - cj);
+//                        cj += overlap * (ci - cj);
+//                    }
+//
+//                    sj.Center = cj;
+//                }
+
                 for( var j = 0; j < i; j++ )
                 {
                     var sj = _spheres[j];
                     var cj = sj.Center;
 
-                    if (si.IsIntersect(sj))
+                    if( si.IsIntersectTime( sj ) )
                     {
-//                        collisions.Add( new Tuple<Sphere, Sphere>(si, sj) );
-                        si.Collisions.Add(sj);
 
-                        var d = si.Distance( sj );
-                        var overlap = 0.5f * (d - si.Radius - sj.Radius) / d;
-
-                        ci -= overlap * (ci - cj);
-                        cj += overlap * (ci - cj);
                     }
-
-                    sj.Center = cj;
                 }
-
+                
                 si.Center = ci;
             }
-            */
             
             // update collided circles velocity
             // ref: https://en.wikipedia.org/wiki/Elastic_collision
@@ -452,12 +457,12 @@ namespace Spheres
 //                s2.Velocity += k * s1.Radius * dot2 * d12;
 //            }
 
-            for (var c = 0; c < grid.Columns; c++)
-                grid.CollisionsWorker(c);
+//            for (var c = 0; c < grid.Columns; c++)
+//                grid.CollisionsWorker(c);
                 
-            grid.VelocityUpdateWorker(new Range(0, grid.Rows * grid.Columns));
+//            grid.VelocityUpdateWorker(new Range(0, grid.Rows * grid.Columns));
 
-            grid.BucketUpdateWorker(new Range(0, grid.Rows * grid.Columns));
+//            grid.BucketUpdateWorker(new Range(0, grid.Rows * grid.Columns));
         }
 
         #endregion

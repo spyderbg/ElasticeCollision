@@ -71,7 +71,7 @@ namespace Spheres
             _isEnabled = true;
             
             _physicsThread = new Thread(UpdateWorker);
-            _physicsThread.Start();
+//            _physicsThread.Start();
         }
 
         void OnDisable()
