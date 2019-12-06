@@ -45,6 +45,8 @@ public class SceneGUI : Editor
             field.ClearSpheresMono();
         }
 
+        field.Speed = GUI.HorizontalSlider(new Rect(20.0f, 70.0f, 100.0f, 40.0f), field.Speed, 0.1f, 5.0f );
+
         Handles.EndGUI();
     }
 

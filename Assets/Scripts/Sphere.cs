@@ -7,7 +7,17 @@ namespace Spheres
 {
     public class Sphere
     {
+        public struct Collision
+        {
+            public float t;     // time of collision
+            public Vector3 c;   // center point in the moment of collision
+            public Vector3 p;   // position in the movement of collision
+            public Vector3 v;   // velocity after collision
+            public Sphere collider;
+        }
+
         #region Ctors
+
         public Sphere( float radius ) : this( radius, Vector3.zero, Vector3.zero ) {}
         public Sphere(float radius, Vector3 center) : this(radius, center, Vector3.zero) {}
         public Sphere(float radius, Vector3 center, Vector3 velocity) 
@@ -15,7 +25,7 @@ namespace Spheres
             Center = center;
             Radius = radius;
             Velocity = velocity;
-            Collisions = new List<Sphere>();
+            Collisions = new List<Collision>();
         }
 
         #endregion
@@ -47,7 +57,7 @@ namespace Spheres
 
         public Vector3 Velocity;
 
-        public IList<Sphere> Collisions;
+        public List<Collision> Collisions;
 
         #endregion
 
@@ -92,7 +102,7 @@ namespace Spheres
         }
 
         public float Distance( Sphere c ) =>
-            Mathf.Sqrt(Mathf.Pow( c.Center.x - Center.x, 2.0f ) + Mathf.Pow( c.Center.y - Center.y, 2.0f ));
+            Mathf.Sqrt(Distance2( c ));
 
         public float Distance2( Sphere c ) =>
             Mathf.Pow( c.Center.x - Center.x, 2.0f ) + Mathf.Pow( c.Center.y - Center.y, 2.0f );

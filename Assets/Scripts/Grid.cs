@@ -21,7 +21,6 @@ namespace Spheres
 
         public Hashtable _buckets = new Hashtable();
 
-
         private readonly int ThreadsNum = 4;
         private ManualResetEvent[] handles;
         private ManualResetEvent _critical;
@@ -32,7 +31,54 @@ namespace Spheres
         private float _deltaTime;
 
         private GameplayGUI _gameplayGui;
-        
+
+        private readonly Vector3Int[] _neighbors = {
+            new Vector3Int(-1, 1, 0),
+            new Vector3Int(-1, 0, 0),
+            new Vector3Int(-1, -1, 0),
+            new Vector3Int(0, 1, 0),
+            new Vector3Int(0, 0, 0),
+            new Vector3Int(0, -1, 0),
+            new Vector3Int(1, 1, 0),
+            new Vector3Int(1, 0, 0),
+            new Vector3Int(1, -1, 0)
+        };
+
+        public class SpheresEnumerator : IEnumerator
+        {
+            private IDictionaryEnumerator _spheres;
+            private IEnumerator _bucket;
+
+            public bool MoveNext()
+            {
+                if(_bucket != null && _bucket.MoveNext()) return true;
+                if( !_spheres.MoveNext() ) return false;
+
+                _bucket = ((IList) _spheres.Current)?.GetEnumerator();
+                return true;
+            }
+
+            public void Reset()
+            {
+                _spheres.Reset();
+                _bucket = null;
+            }
+
+            public object Current => _bucket?.Current;
+        }
+
+        public class SpheresEnum : IEnumerable
+        {
+            IEnumerator IEnumerable.GetEnumerator()
+            {
+                return (IEnumerator) GetEnumerator();
+            }
+            public SpheresEnumerator GetEnumerator()
+            {
+                return new SpheresEnumerator();
+            }
+        }
+
         #region Overwrite methods
 
         private void Awake()
@@ -91,6 +137,21 @@ namespace Spheres
 
         #region Public methods 
 
+        public bool HasSpheres => _buckets?.Count > 0;
+
+        public int SpheresNumber
+        {
+            get {
+                if (_buckets == null || _buckets.Count == 0) return 0;
+
+                return _buckets
+                    .Cast<object>()
+                    .Sum( bucket => ((IList<Sphere>) bucket).Count() );
+            }
+        }
+
+        public SpheresEnum Spheres => new SpheresEnum();
+
         public bool IsIntersect(Sphere sphere)
         {
             var c = new Vector3Int(
@@ -98,28 +159,7 @@ namespace Spheres
                 (int) (sphere.Center.y % Rows),
                 0);
 
-            Vector3Int[] neighbors = {
-                new Vector3Int(-1, 1, 0),
-                new Vector3Int(-1, 0, 0),
-                new Vector3Int(-1, -1, 0),
-                new Vector3Int(0, 1, 0),
-                new Vector3Int(0, 0, 0),
-                new Vector3Int(0, -1, 0),
-                new Vector3Int(1, 1, 0),
-                new Vector3Int(1, 0, 0),
-                new Vector3Int(1, -1, 0)
-            };
-
-            return neighbors.Any(n => IsIntersect(sphere, c + n)); 
-//            return IsIntersect( sphere, x, y, 0 )
-//                   || IsIntersect(sphere, x - 1, y + 1, 0 )
-//                   || IsIntersect(sphere, x - 1, y, 0 )
-//                   || IsIntersect(sphere, x - 1, y - 1, 0 )
-//                   || IsIntersect(sphere, x, y + 1, 0 )
-//                   || IsIntersect(sphere, x, y - 1, 0 )
-//                   || IsIntersect(sphere, x + 1, y + 1, 0 )
-//                   || IsIntersect(sphere, x + 1, y, 0 )
-//                   || IsIntersect(sphere, x + 1, y - 1, 0 );
+            return _neighbors.Any(n => IsIntersect(sphere, c + n)); 
         }
 
         public bool IsIntersect(Sphere sphere, Vector3Int pos)
@@ -136,35 +176,37 @@ namespace Spheres
 
         public Sphere Intersect(Sphere sphere)
         {
-            var c = new Vector3Int(
-                (int) (sphere.Center.x % Columns),
-                (int) (sphere.Center.y % Rows),
-                0);
-            
-            Vector3Int[] neighbors = {
-                new Vector3Int(-1, 1, 0),
-                new Vector3Int(-1, 0, 0),
-                new Vector3Int(-1, -1, 0),
-                new Vector3Int(0, 1, 0),
-                new Vector3Int(0, 0, 0),
-                new Vector3Int(0, -1, 0),
-                new Vector3Int(1, 1, 0),
-                new Vector3Int(1, 0, 0),
-                new Vector3Int(1, -1, 0)
-            };
-            
-            return neighbors.Select(n => Intersect(sphere, c + n)).FirstOrDefault(s => s != null);
+            var c = GetHash( sphere );
+
+            return _neighbors
+                .Select( n => Intersect( sphere, c + n.x + n.y * Rows ))
+                .FirstOrDefault( s => s != null );
         }
-        
+
+        public Sphere Intersect( Sphere sphere, int key )
+        {
+            return key >= 0 && _buckets.Contains( key )
+                ? ((List<Sphere>)_buckets[key])?.FirstOrDefault(sphere.IsIntersect)
+                : null;
+        }
+
         public Sphere Intersect(Sphere sphere, Vector3Int pos)
         {
             if( pos.x < 0 || Columns <= pos.x || pos.y < 0 || Rows <= pos.y || pos.z < 0 ) 
                 return null;
 
-            var key = GetHash(pos.x, pos.y);
-            var bucket = _buckets[key];
-            
-            return ((IList<Sphere>) bucket)?.FirstOrDefault(sphere.IsIntersect);
+            return ((IList<Sphere>) _buckets[GetHash(pos)])?.FirstOrDefault(sphere.IsIntersect);
+        }
+
+        public int IntersectCount()
+        {
+            if(!HasSpheres) return 0;
+
+            var spheres = Spheres as IQueryable<Sphere>;
+            var intersectCount = spheres?.Sum( sphere => spheres.Sum( s => sphere.IsIntersect( s ) ? 1 : 0)) ?? 0;
+            intersectCount -= SpheresNumber;  // remove self intersections
+            intersectCount /= 2;              // remove mirror intersections
+            return intersectCount;
         }
         
         public void UpdateCollisions( Sphere sphere, int x, int y, int z = 0 )
@@ -392,13 +434,13 @@ namespace Spheres
                     if(!sphere.Collisions.Any()) continue;
 
                     var s1 = sphere;
-                    var s2 = sphere.Collisions.OrderBy(s => sphere.Distance(s)).First();
+//                    var s2 = sphere.Collisions.OrderBy(s => sphere.Distance(s)).First();
 
-                    var n = (s2.Center - s1.Center).normalized;
-                    var dot = Vector3.Dot(s1.Velocity - s2.Velocity, n);
-                    var k = 2.0f * dot / (s1.Radius + s2.Radius);
-                    s1.Velocity -= k * s2.Radius * n;
-                    s2.Velocity += k * s1.Radius * n;
+//                    var n = (s2.Center - s1.Center).normalized;
+//                    var dot = Vector3.Dot(s1.Velocity - s2.Velocity, n);
+//                    var k = 2.0f * dot / (s1.Radius + s2.Radius);
+//                    s1.Velocity -= k * s2.Radius * n;
+//                    s2.Velocity += k * s1.Radius * n;
                 }
             }
             
@@ -432,6 +474,7 @@ namespace Spheres
         }
         
         #endregion
+
     }
 
 } // namespace Spehres
