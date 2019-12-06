@@ -15,8 +15,24 @@ namespace Spheres
     [ExecuteInEditMode]
     public class Field : MonoBehaviour
     {
+        public enum RandomizeMethods
+        {
+            Simple,
+            MoveRight
+        }
+        public enum RenderMethods
+        {
+            Mono,
+            Mesh,
+            ByBuckets,
+            Indirect
+        }
+
+        public RandomizeMethods RandomizeMethod = RandomizeMethods.MoveRight;
+        public RenderMethods RenderMethod = RenderMethods.Mono;
         public GameObject Grid;
         public GameObject Spheres; 
+        
         public int SphereNumbers;
 
         public float MinRadius = .02f;
@@ -30,14 +46,14 @@ namespace Spheres
 
         public float Speed = 1.0f;
 
-
         private Grid _grid;
         private ComputeBuffer _positionBuffer;
         private ComputeBuffer _argsBuffer;
         private int _cachedInstanceCount = -1;
         private uint[] args = new uint[5] { 0, 0, 0, 0, 0 };
 
-
+        #region MonoBehaviour
+        
         void Start()
         {
             _grid = Grid.GetComponent<Grid>();
@@ -47,9 +63,18 @@ namespace Spheres
 
         void Update()
         {
+            if(_grid == null )
+                _grid = Grid.GetComponent<Grid>();
+        
+            // check for recreate
+            if ( _grid.SpheresNumber != SphereNumbers )
+            {
+                SyncVisualSpheres();
+                return;
+            }
+            
             Simulate(Speed * Time.deltaTime);
-            Draw();
-
+            RenderSpheres();
         }
 
         void OnDrawGizmos()
@@ -75,18 +100,30 @@ namespace Spheres
 
         private void OnGridUpdate()
         {
-
             var camera = Camera.main;
             var pos = camera.transform.position;
             camera.transform.position = new Vector3(_grid.Width / 2.0f, _grid.Height / 2.0f, pos.z);
         }
+        
+        #endregion
 
+        #region Statistics 
+        
+        public void PrintIntersectionsCount()
+        {
+            if(!_grid.HasSpheres) return;
+
+            Debug.Log( message: $"Sphere intersections count: {_grid.IntersectCount()}" );
+        }
+        
+        #endregion
+        
         #region Randomize methos
-
+        
+        private delegate bool PositionSpheres(Sphere sphere, bool checkOverlaping = true);
+        
         public void RandomizeSpheres()
         {
-            var startTime = Time.realtimeSinceStartup;
-            
             // validate input data 
             if( _grid.CellX < MaxRadius * 2.0f || _grid.CellY < MaxRadius * 2.0f )
             {
@@ -100,81 +137,53 @@ namespace Spheres
             }
 
             // create spheres
+            PositionSpheres positionMethod;
+            switch (RandomizeMethod)
+            {
+                case RandomizeMethods.Simple: positionMethod = PositionSphereSimple; break;
+                case RandomizeMethods.MoveRight: positionMethod = PositionSphereMoveRight; break;
+                default:
+                    throw new ArgumentOutOfRangeException("Spheres randomize method is not specified!!!");
+            }
+            
+            _grid.ClearBuckets();
 
             for( var i = 0; i < SphereNumbers; i++ )
-            {
-                var sphere = new Sphere(Random.Range(MinRadius, MaxRadius));
-
-            }
-
-            foreach( var sphere in spheres.AsEnumerable() )
             {
                 var velocity = new Vector3() {
                     x = Random.Range(-1.0f, 1.0f),
                     y = Random.Range(-1.0f, 1.0f),
                     z = .0f
                 };
-
+            
+                var sphere = new Sphere();
+                sphere.Radius = Random.Range(MinRadius, MaxRadius);
                 sphere.Velocity = Vector3.ClampMagnitude( velocity, Random.Range( MinVelocity, MaxVelocity ));
+                
+                if( !positionMethod( sphere, true )) continue;
+                
+                _grid.AddSphere( sphere );
             }
-
-
-            // position spheres
-            compIntersect = 0;
-            compensateCount = 0;
-            
-            _grid.ClearBuckets();
-            foreach( var sphere in spheres )
-            {
-                if( PositionSphere( sphere, true ) )
-                {
-                    _grid.AddSphere( sphere );
-                    SyncVisualSpheres();
-                }
-            }
-            
-            Debug.Log($"compIntersect: {compIntersect} compensateCount: {compensateCount}");
-
-            // update instanced buffers
-            UpdateBuffers();
-            Debug.Log($"Randomize spheres duration {Time.realtimeSinceStartup - startTime}");
-
-            PrintIntersections();
         }
 
-        public void PrintIntersections()
-        {
-            if(!_grid.HasSpheres) return;
-
-            Debug.Log( message: $"Sphere intersections count: {_grid.IntersectCount()}" );
-        }
-
-        public void SyncWithVisualSpheres()
-        {
-            if(!_grid.HasSpheres) return;
-
-//            var i = 0;
-//            foreach( var t in Spheres.transform.GetComponentsInChildren<MeshFilter>() )
-//                _spheres[i++].Center = t.transform.position;
-        }
-
-        public void SyncVisualSpheres()
-        {
-            if(!_grid.HasSpheres) return;
-
-//            var i = 0;
-//            foreach( var t in Spheres.transform.GetComponentsInChildren<MeshFilter>() )
-//                 t.transform.position = _spheres[i++].Center;
-        }
-
-        private int compIntersect = 0;
-        private int compensateCount = 0;
-
-        private bool PositionSphere(Sphere sphere, bool checkOverlaping = true)
+        private bool PositionSphereSimple(Sphere sphere, bool checkOverlaping = true)
         {
             var maxAttempts = 100;
-            var grid = _grid.GetComponent<Grid>();
+            
+            do {
+                var center = sphere.Center;
+                center.x = Random.Range( MaxRadius, _grid.Width - MaxRadius );
+                center.y = Random.Range( MaxRadius, _grid.Height - MaxRadius );
+                sphere.Center = center;
+            } while( checkOverlaping && _grid.IsIntersect(sphere) && --maxAttempts > 0 );
 
+            return maxAttempts > 0;
+        }
+
+        private bool PositionSphereMoveRight(Sphere sphere, bool checkOverlaping = true)
+        {
+            var maxAttempts = 10;
+            
             do {
                 var center = sphere.Center;
                 center.x = Random.Range( MaxRadius, _grid.Width - MaxRadius );
@@ -183,43 +192,28 @@ namespace Spheres
 
                 if (!checkOverlaping) break;
 
-                while( _grid.IsIntersect(sphere) && center.x < _grid.Width )
+                for (;;)
                 {
-                    center.x += sphere.Radius;
+                    if (_grid.IsIntersect(sphere))
+                    {
+                        center.x += sphere.Radius;
+                        if (center.x > _grid.Width - sphere.Radius)
+                            break;
+                        sphere.Center = center;
+                    }
+                    else
+                    {
+                        return true;
+                    }
                 }
-//                compIntersect += intersectSphere == null ? 0 : 1;
-//                while( intersectSphere != null && center.x < _grid.Width)
-//                {
-//                    center.x += 2.0f * intersectSphere.Radius;
-//                    intersectSphere = _grid.Intersect(sphere);
-//                }
-                
-
-                if( !(center.x < _grid.Width - sphere.Radius) ) continue;
-
-                compensateCount++;
-
-                if( _grid.IntersectCount() > 0 )
-                {
-                    Debug.LogError( "Error" );
-                }
-                break;
             } while( --maxAttempts > 0 );
 
             return maxAttempts > 0;
         }
-
+        
         #endregion
 
-        #region Draw methods
-
-        public void Draw()
-        {
-            DrawSpheresMono();
-//            DrawSpheresMesh();
-//            DrawSpheresByBuckets();
-//            DrawSpheresIndirect();
-        }
+        #region Render methods
 
         public void ClearSpheresMono()
         {
@@ -230,27 +224,62 @@ namespace Spheres
                 DestroyImmediate(t.gameObject);
         }
 
-        public void DrawSpheresMono()
+        public void RenderSpheres()
         {
-            if(_grid.HasSpheres && _grid.SpheresNumber == Spheres.transform.childCount && _grid.SpheresNumber == SphereNumbers)
-                SyncVisualSpheres();
-
-            // recreate spheres
-            ClearSpheresMono();
-            RandomizeSpheres();
-
+            if (!_grid.HasSpheres) return;
+            
+            switch (RenderMethod)
             {
-                var sphere = _spheres[i];
-                var go = GameObject.CreatePrimitive( PrimitiveType.Sphere );
-                go.name = $"sphere_{i}";
-                go.transform.position = sphere.Center;
-                go.transform.localScale = new Vector3( 2.0f * sphere.Radius, 2.0f * sphere.Radius, 2.0f * sphere.Radius );
-                go.transform.parent = Spheres.transform;
-                go.GetComponent<Renderer>().sharedMaterial.color = Color.white;
+                case RenderMethods.Mono: RenderSpheresMono(); break;
+                case RenderMethods.Mesh: RenderSpheresMesh(); break;
+                case RenderMethods.ByBuckets: RenderSpheresByBuckets(); break;
+                case RenderMethods.Indirect: RenderSpheresIndirect(); break;
+                default:
+                    throw new ArgumentOutOfRangeException($"Spheres render mehtod is not specified!!!");
             }
         }
 
-        public void DrawSpheresMesh()
+        private void SyncWithVisualSpheres()
+        {
+            if(!_grid.HasSpheres) return;
+
+//            var i = 0;
+//            foreach( var t in Spheres.transform.GetComponentsInChildren<MeshFilter>() )
+//                _spheres[i++].Center = t.transform.position;
+        }
+
+        private void SyncVisualSpheres()
+        {
+            if(!_grid.HasSpheres) return;
+
+//            var i = 0;
+//            foreach( var t in Spheres.transform.GetComponentsInChildren<MeshFilter>() )
+//                 t.transform.position = _spheres[i++].Center;
+        }
+
+        private void RenderSpheresMono()
+        {
+            if (_grid.SpheresNumber != Spheres.transform.childCount)
+            {
+                ClearSpheresMono();
+                RandomizeSpheres();
+            }
+
+            SyncVisualSpheres();
+            // recreate spheres
+
+//            {
+//                var sphere = _spheres[i];
+//                var go = GameObject.CreatePrimitive( PrimitiveType.Sphere );
+//                go.name = $"sphere_{i}";
+//                go.transform.position = sphere.Center;
+//                go.transform.localScale = new Vector3( 2.0f * sphere.Radius, 2.0f * sphere.Radius, 2.0f * sphere.Radius );
+//                go.transform.parent = Spheres.transform;
+//                go.GetComponent<Renderer>().sharedMaterial.color = Color.white;
+//            }
+        }
+
+        private void RenderSpheresMesh()
         {
             if(!_grid.HasSpheres) return;
 
@@ -268,7 +297,7 @@ namespace Spheres
             }
         }
 
-        public void DrawSpheresByBuckets()
+        private void RenderSpheresByBuckets()
         {
             var grid = _grid.GetComponent<Grid>();
             for (var i = 0; i < _grid.Rows * _grid.Columns; i++)
@@ -295,7 +324,7 @@ namespace Spheres
             }
         }
 
-        public void DrawSpheresIndirect()
+        private void RenderSpheresIndirect()
         {
             if(!_grid.HasSpheres) return;
 
@@ -344,7 +373,6 @@ namespace Spheres
         {
             if(!_grid.HasSpheres) return;
             
-            var grid = _grid.GetComponent<Grid>();
             
 //            UpdatePositions(deltaTime);
 //            UpdatePositions2( deltaTime );

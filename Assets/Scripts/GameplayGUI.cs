@@ -13,7 +13,7 @@ public class GameplayGUI : MonoBehaviour
         if (GUI.Button( new Rect(10.0f, 10.0f, 100.0f, 50.0f), "Randomize"))
         {
             field.RandomizeSpheres();
-            field.Draw();
+            field.RenderSpheres();
         }
         
         Speed = GUI.HorizontalSlider(new Rect(120.0f, 20.0f, 100.0f, 40.0f), Speed, 0.1f, 3.0f );

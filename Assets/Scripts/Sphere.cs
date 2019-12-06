@@ -18,6 +18,7 @@ namespace Spheres
 
         #region Ctors
 
+        public Sphere() : this( 1.0f, Vector3.zero, Vector3.zero ) {}
         public Sphere( float radius ) : this( radius, Vector3.zero, Vector3.zero ) {}
         public Sphere(float radius, Vector3 center) : this(radius, center, Vector3.zero) {}
         public Sphere(float radius, Vector3 center, Vector3 velocity) 
@@ -106,8 +107,6 @@ namespace Spheres
 
         public float Distance2( Sphere c ) =>
             Mathf.Pow( c.Center.x - Center.x, 2.0f ) + Mathf.Pow( c.Center.y - Center.y, 2.0f );
-
-
 
         #endregion
 

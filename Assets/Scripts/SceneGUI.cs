@@ -18,7 +18,7 @@ public class SceneGUI : Editor
         if (GUI.Button( new Rect(10.0f, 10.0f, 100.0f, 50.0f), "Randomize"))
         {
             field.RandomizeSpheres();
-            field.Draw();
+            field.RenderSpheres();
         }
 
         // Grid visible button
@@ -32,12 +32,12 @@ public class SceneGUI : Editor
 
         if( GUI.Button( new Rect( 230.0f, 10.0f, 100.0f, 50.0f ), "Count intersec.") )
         {
-            field.PrintIntersections();
+            field.PrintIntersectionsCount();
         }
 
         if( GUI.Button( new Rect( 340.0f, 10.0f, 100.0f, 50.0f ), "Sync spheres") )
         {
-            field.SyncWithVisualSpheres();
+//            field.SyncWithVisualSpheres();
         }
 
         if( GUI.Button( new Rect( 450.0f, 10.0f, 100.0f, 50.0f ), "Clear") )

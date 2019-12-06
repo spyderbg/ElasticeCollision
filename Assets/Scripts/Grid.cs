@@ -144,9 +144,15 @@ namespace Spheres
             get {
                 if (_buckets == null || _buckets.Count == 0) return 0;
 
-                return _buckets
-                    .Cast<object>()
-                    .Sum( bucket => ((IList<Sphere>) bucket).Count() );
+//                return _buckets.Cast<object>()
+//                    .Sum(b => ((IList<Sphere>) b).Count);
+                var sum = 0;
+                foreach (var bucket in _buckets.Values)
+                {
+                    var b = ((List<Sphere>) bucket);
+                    sum = sum + b.Count;
+                }
+                return sum;
             }
         }
 
