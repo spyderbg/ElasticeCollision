@@ -56,6 +56,8 @@ namespace Spheres
 
         public float Radius2 { get; private set; }
 
+        public float Diameter => Radius * 2.0f;
+
         public Vector3 Velocity;
 
         public List<Collision> Collisions;

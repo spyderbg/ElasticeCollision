@@ -12,6 +12,7 @@ public class GameplayGUI : MonoBehaviour
         // Randomize button
         if (GUI.Button( new Rect(10.0f, 10.0f, 100.0f, 50.0f), "Randomize"))
         {
+            field.ClearSphereObjects();
             field.RandomizeSpheres();
             field.RenderSpheres();
         }

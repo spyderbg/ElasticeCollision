@@ -49,12 +49,21 @@ namespace Spheres
             private IDictionaryEnumerator _spheres;
             private IEnumerator _bucket;
 
+            public SpheresEnumerator(Hashtable buckets)
+            {
+                _spheres = buckets.GetEnumerator();
+            }
+
             public bool MoveNext()
             {
-                if(_bucket != null && _bucket.MoveNext()) return true;
+                if(_bucket != null && _bucket.MoveNext())
+                    return true;
+
                 if( !_spheres.MoveNext() ) return false;
 
-                _bucket = ((IList) _spheres.Current)?.GetEnumerator();
+                _bucket = ((IList) _spheres.Value)?.GetEnumerator();
+                _bucket.MoveNext();
+
                 return true;
             }
 
@@ -67,15 +76,21 @@ namespace Spheres
             public object Current => _bucket?.Current;
         }
 
-        public class SpheresEnum : IEnumerable
+        public class SpheresEnumerable : IEnumerable
         {
+            private readonly Hashtable _buckets;
+
+            public SpheresEnumerable(Hashtable buckets)
+            {
+                _buckets = buckets;
+            }
             IEnumerator IEnumerable.GetEnumerator()
             {
                 return (IEnumerator) GetEnumerator();
             }
             public SpheresEnumerator GetEnumerator()
             {
-                return new SpheresEnumerator();
+                return new SpheresEnumerator(_buckets);
             }
         }
 
@@ -144,19 +159,13 @@ namespace Spheres
             get {
                 if (_buckets == null || _buckets.Count == 0) return 0;
 
-//                return _buckets.Cast<object>()
-//                    .Sum(b => ((IList<Sphere>) b).Count);
-                var sum = 0;
-                foreach (var bucket in _buckets.Values)
-                {
-                    var b = ((List<Sphere>) bucket);
-                    sum = sum + b.Count;
-                }
-                return sum;
+                return _buckets
+                    .Cast<DictionaryEntry>()
+                    .Sum(b => ((IList<Sphere>) b.Value).Count);
             }
         }
 
-        public SpheresEnum Spheres => new SpheresEnum();
+        public SpheresEnumerable Spheres => new SpheresEnumerable(_buckets);
 
         public bool IsIntersect(Sphere sphere)
         {

@@ -17,6 +17,7 @@ public class SceneGUI : Editor
         // Randomize button
         if (GUI.Button( new Rect(10.0f, 10.0f, 100.0f, 50.0f), "Randomize"))
         {
+            field.ClearSphereObjects();
             field.RandomizeSpheres();
             field.RenderSpheres();
         }
@@ -38,11 +39,6 @@ public class SceneGUI : Editor
         if( GUI.Button( new Rect( 340.0f, 10.0f, 100.0f, 50.0f ), "Sync spheres") )
         {
 //            field.SyncWithVisualSpheres();
-        }
-
-        if( GUI.Button( new Rect( 450.0f, 10.0f, 100.0f, 50.0f ), "Clear") )
-        {
-            field.ClearSpheresMono();
         }
 
         field.Speed = GUI.HorizontalSlider(new Rect(20.0f, 70.0f, 100.0f, 40.0f), field.Speed, 0.1f, 5.0f );

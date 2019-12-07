@@ -33,7 +33,7 @@ namespace Spheres
         public GameObject Grid;
         public GameObject Spheres; 
         
-        public int SphereNumbers;
+        public int SpheresNumber;
 
         public float MinRadius = .02f;
         public float MaxRadius = .05f;
@@ -67,9 +67,9 @@ namespace Spheres
                 _grid = Grid.GetComponent<Grid>();
         
             // check for recreate
-            if ( _grid.SpheresNumber != SphereNumbers )
+            if ( _grid.SpheresNumber != SpheresNumber )
             {
-                SyncVisualSpheres();
+                RandomizeSpheres();
                 return;
             }
             
@@ -127,13 +127,8 @@ namespace Spheres
             // validate input data 
             if( _grid.CellX < MaxRadius * 2.0f || _grid.CellY < MaxRadius * 2.0f )
             {
-                Debug.LogError( $"Input parameters error: circle radius too large, reduce it and try again!" );
-	            //return;
-            }
-            if(!SystemInfo.supportsInstancing)
-            {
-                Debug.LogError( $"GPU instancing not supported" );
-                return;
+//                Debug.LogError( $"Input parameters error: circle radius too large, reduce it and try again!" );
+//	            return;
             }
 
             // create spheres
@@ -148,7 +143,7 @@ namespace Spheres
             
             _grid.ClearBuckets();
 
-            for( var i = 0; i < SphereNumbers; i++ )
+            for( var i = 0; i < SpheresNumber; i++ )
             {
                 var velocity = new Vector3() {
                     x = Random.Range(-1.0f, 1.0f),
@@ -215,12 +210,12 @@ namespace Spheres
 
         #region Render methods
 
-        public void ClearSpheresMono()
+        public void ClearSphereObjects()
         {
             var spheres = Spheres.transform.GetComponentsInChildren<MeshFilter>();
-            if( spheres == null ) return;
+            if (spheres == null) return;
 
-            foreach( var t in spheres )
+            foreach (var t in spheres)
                 DestroyImmediate(t.gameObject);
         }
 
@@ -252,31 +247,33 @@ namespace Spheres
         {
             if(!_grid.HasSpheres) return;
 
-//            var i = 0;
-//            foreach( var t in Spheres.transform.GetComponentsInChildren<MeshFilter>() )
-//                 t.transform.position = _spheres[i++].Center;
+            var idx = 0;
+            var go = Spheres.transform.GetComponentsInChildren<MeshFilter>();
+            foreach( Sphere si in _grid.Spheres )
+                go[idx++].transform.position = si.Center;
         }
 
         private void RenderSpheresMono()
         {
             if (_grid.SpheresNumber != Spheres.transform.childCount)
             {
-                ClearSpheresMono();
-                RandomizeSpheres();
+                // destroy sphere gameObjects
+                ClearSphereObjects();
+
+                // recreate spheres
+                var idx = 1;
+                foreach( Sphere si in _grid.Spheres )
+                {
+                    var go = GameObject.CreatePrimitive( PrimitiveType.Sphere );
+                    go.name = $"sphere_{idx++}";
+                    go.transform.position = si.Center;
+                    go.transform.localScale = new Vector3( si.Diameter, si.Diameter, si.Diameter );
+                    go.transform.parent = Spheres.transform;
+                    go.GetComponent<Renderer>().sharedMaterial.color = Color.white;
+                }
             }
 
             SyncVisualSpheres();
-            // recreate spheres
-
-//            {
-//                var sphere = _spheres[i];
-//                var go = GameObject.CreatePrimitive( PrimitiveType.Sphere );
-//                go.name = $"sphere_{i}";
-//                go.transform.position = sphere.Center;
-//                go.transform.localScale = new Vector3( 2.0f * sphere.Radius, 2.0f * sphere.Radius, 2.0f * sphere.Radius );
-//                go.transform.parent = Spheres.transform;
-//                go.GetComponent<Renderer>().sharedMaterial.color = Color.white;
-//            }
         }
 
         private void RenderSpheresMesh()
@@ -291,7 +288,7 @@ namespace Spheres
             foreach( Sphere s in _grid.Spheres )
             {
                 var matrix = Matrix4x4.Translate(s.Center) *
-                             Matrix4x4.Scale(new Vector3(2.0f * s.Radius, 2.0f * s.Radius, 2.0f * s.Radius));
+                             Matrix4x4.Scale(new Vector3(s.Diameter, s.Diameter, s.Diameter));
 
                 Graphics.DrawMesh( mesh, matrix, material, 0 );
             }
@@ -310,7 +307,7 @@ namespace Spheres
                     {
                         //Debug.Log($"sphere({sphere.Center.x}, {sphere.Center.y}, {sphere.Center.z})");
                         var matrix = Matrix4x4.Translate(sphere.Center) *
-                                     Matrix4x4.Scale(new Vector3(2.0f * sphere.Radius, 2.0f * sphere.Radius, 2.0f * sphere.Radius));
+                                     Matrix4x4.Scale(new Vector3(sphere.Diameter, sphere.Diameter, sphere.Diameter));
                         try
                         {
                             Graphics.DrawMesh(InstanceMesh, matrix, InstanceMaterial, 0);
@@ -327,6 +324,12 @@ namespace Spheres
         private void RenderSpheresIndirect()
         {
             if(!_grid.HasSpheres) return;
+
+            if(!SystemInfo.supportsInstancing)
+            {
+                Debug.LogError( $"GPU instancing not supported" );
+                return;
+            }
 
             Graphics.DrawMeshInstancedIndirect(InstanceMesh, 0, InstanceMaterial, new UnityEngine.Bounds(Vector3.zero, new Vector3(10.0f, 10.0f, 10.0f)), _argsBuffer);
         }
@@ -347,7 +350,7 @@ namespace Spheres
             var idx = 0;
             var positions = new Vector4[_cachedInstanceCount];
             foreach( Sphere s in _grid.Spheres )
-                positions[idx++] = new Vector4(s.Center.x, s.Center.y, s.Center.z, 2.0f * s.Radius);
+                positions[idx++] = new Vector4(s.Center.x, s.Center.y, s.Center.z, s.Diameter);
 
             _positionBuffer.SetData( positions );
             InstanceMaterial.SetBuffer("positionBuffer", _positionBuffer);
