@@ -31,12 +31,12 @@ public class SceneGUI : Editor
             grid.gameObject.SetActive( _isGridVisible );
         }
 
-        if( GUI.Button( new Rect( 230.0f, 10.0f, 100.0f, 50.0f ), "Count intersec.") )
+        if( GUI.Button( new Rect( 230.0f, 10.0f, 100.0f, 50.0f ), "Intersections") )
         {
             field.PrintIntersectionsCount();
         }
 
-        if( GUI.Button( new Rect( 340.0f, 10.0f, 100.0f, 50.0f ), "Sync spheres") )
+        if( GUI.Button( new Rect( 340.0f, 10.0f, 100.0f, 50.0f ), "Sync Spheres") )
         {
 //            field.SyncWithVisualSpheres();
         }

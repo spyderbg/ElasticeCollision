@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using UnityEngine;
 using UnityEngine.SocialPlatforms;
+using IList = System.Collections.IList;
 
 namespace Spheres
 {
@@ -46,34 +47,34 @@ namespace Spheres
 
         public class SpheresEnumerator : IEnumerator
         {
-            private IDictionaryEnumerator _spheres;
-            private IEnumerator _bucket;
+            private IDictionaryEnumerator _bucketsEnum;
+            private IEnumerator _spheresEnum;
 
             public SpheresEnumerator(Hashtable buckets)
             {
-                _spheres = buckets.GetEnumerator();
+                _bucketsEnum = buckets.GetEnumerator();
             }
 
             public bool MoveNext()
             {
-                if(_bucket != null && _bucket.MoveNext())
+                if(_spheresEnum != null && _spheresEnum.MoveNext())
                     return true;
 
-                if( !_spheres.MoveNext() ) return false;
+                if( !_bucketsEnum.MoveNext() ) return false;
 
-                _bucket = ((IList) _spheres.Value)?.GetEnumerator();
-                _bucket.MoveNext();
+                _spheresEnum = ((IList) _bucketsEnum.Value)?.GetEnumerator();
+                _spheresEnum.MoveNext();
 
                 return true;
             }
 
             public void Reset()
             {
-                _spheres.Reset();
-                _bucket = null;
+                _bucketsEnum.Reset();
+                _spheresEnum = null;
             }
 
-            public object Current => _bucket?.Current;
+            public object Current => _spheresEnum?.Current;
         }
 
         public class SpheresEnumerable : IEnumerable
@@ -91,6 +92,59 @@ namespace Spheres
             public SpheresEnumerator GetEnumerator()
             {
                 return new SpheresEnumerator(_buckets);
+            }
+        }
+
+        public class BucketsEnumerator : IEnumerator
+        {
+            private IDictionaryEnumerator _bucketsEnum;
+
+            public BucketsEnumerator( Hashtable buckets )
+            {
+                _bucketsEnum = buckets.GetEnumerator();
+            }
+
+            public bool MoveNext()
+            {
+                var hasNext = _bucketsEnum.MoveNext();
+
+                while(hasNext)
+                {
+                    var spheres = _bucketsEnum.Value as IList<Int32>;
+                    if (!(spheres?.Any() ?? false))
+                        break;
+
+                    hasNext = _bucketsEnum.MoveNext();
+                }
+
+                return hasNext;
+            }
+
+            public void Reset()
+            {
+                _bucketsEnum.Reset();
+            }
+
+            public object Current => _bucketsEnum.Value;
+        }
+
+        public class BucketsEnumerable : IEnumerable
+        {
+            private readonly Hashtable _buckets;
+
+            public BucketsEnumerable( Hashtable buckets )
+            {
+                _buckets = buckets;
+            }
+
+            IEnumerator IEnumerable.GetEnumerator()
+            {
+                return GetEnumerator();
+            }
+
+            public BucketsEnumerator GetEnumerator()
+            {
+                return new BucketsEnumerator(_buckets);
             }
         }
 
@@ -152,6 +206,8 @@ namespace Spheres
 
         #region Public methods 
 
+        public IEnumerable Buckets => new BucketsEnumerable( _buckets );
+
         public bool HasSpheres => _buckets?.Count > 0;
 
         public int SpheresNumber
@@ -170,8 +226,8 @@ namespace Spheres
         public bool IsIntersect(Sphere sphere)
         {
             var c = new Vector3Int(
-                (int) (sphere.Center.x % Columns),
-                (int) (sphere.Center.y % Rows),
+                (int) (sphere.Center.x / Columns),
+                (int) (sphere.Center.y / Rows),
                 0);
 
             return _neighbors.Any(n => IsIntersect(sphere, c + n)); 
@@ -217,10 +273,15 @@ namespace Spheres
         {
             if(!HasSpheres) return 0;
 
-            var spheres = Spheres as IQueryable<Sphere>;
-            var intersectCount = spheres?.Sum( sphere => spheres.Sum( s => sphere.IsIntersect( s ) ? 1 : 0)) ?? 0;
-            intersectCount -= SpheresNumber;  // remove self intersections
-            intersectCount /= 2;              // remove mirror intersections
+            var intersectCount = 0;
+            foreach( Sphere si in Spheres )
+            foreach( Sphere sj in Spheres )
+            {
+                if(si == sj) continue;
+
+                intersectCount += si.IsIntersect( sj ) ? 1 : 0;
+            }
+            intersectCount /= 2;    // remove mirror intersections
             return intersectCount;
         }
         
@@ -362,14 +423,13 @@ namespace Spheres
             => x + Columns * y;
 
         private int GetHash(Vector3Int p)
-            => GetHash(p.x % Columns, p.y % Rows, 0);
+            => GetHash(p.x / Columns, p.y / Rows, 0);
 
         private int GetHash(Vector3 position)
-            => GetHash((int)(position.x % Columns), (int)(position.y % Rows), 0);
+            => GetHash((int)(position.x / Columns), (int)(position.y / Rows), 0);
 
         private int GetHash(Sphere sphere)
             => GetHash(sphere.Center);
-
 
         private void UpdateWorker(object data)
         {

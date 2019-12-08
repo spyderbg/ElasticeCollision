@@ -138,7 +138,7 @@ namespace Spheres
                 case RandomizeMethods.Simple: positionMethod = PositionSphereSimple; break;
                 case RandomizeMethods.MoveRight: positionMethod = PositionSphereMoveRight; break;
                 default:
-                    throw new ArgumentOutOfRangeException("Spheres randomize method is not specified!!!");
+                    throw new ArgumentOutOfRangeException( $"Spheres randomize method is not specified!!!" );
             }
             
             _grid.ClearBuckets();
@@ -278,45 +278,63 @@ namespace Spheres
 
         private void RenderSpheresMesh()
         {
-            if(!_grid.HasSpheres) return;
-
+            // create mesh
             var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             var mesh = go.GetComponent<MeshFilter>().sharedMesh;
-            var material = go.GetComponent<Renderer>().sharedMaterial; material.color = Color.red;
+            var material = go.GetComponent<Renderer>().sharedMaterial; 
+            material.color = Color.red;
             DestroyImmediate(go);
 
+            // render spheres
             foreach( Sphere s in _grid.Spheres )
             {
                 var matrix = Matrix4x4.Translate(s.Center) *
                              Matrix4x4.Scale(new Vector3(s.Diameter, s.Diameter, s.Diameter));
 
-                Graphics.DrawMesh( mesh, matrix, material, 0 );
+                try {
+                    Graphics.DrawMesh( mesh, matrix, material, 0 );
+                }
+                catch (Exception e) {
+                    Debug.Log($"RenderSpheresMesh::DrawMesh Exception: {e}");
+                }
             }
         }
 
         private void RenderSpheresByBuckets()
         {
-            var grid = _grid.GetComponent<Grid>();
-            for (var i = 0; i < _grid.Rows * _grid.Columns; i++)
+            if(!SystemInfo.supportsInstancing)
             {
-                if(!(_grid._buckets[i] is List<Sphere> bucket)) continue;
+                Debug.LogError( $"GPU instancing not supported" );
+                return;
+            }
 
-                lock (bucket)
+            // create mesh
+            var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            var mesh = go.GetComponent<MeshFilter>().sharedMesh;
+            var material = go.GetComponent<Renderer>().sharedMaterial; 
+            material.color = Color.blue;
+            material.enableInstancing = true;
+            DestroyImmediate(go);
+
+            // render spheres
+            var matrices = new Matrix4x4[10];
+            foreach( IList<Sphere> bucket in _grid.Buckets )
+            {
+                var idx = 0;
+                if(matrices.Length < bucket.Count)
+                    matrices = new Matrix4x4[bucket.Count];
+
+                foreach (var sphere in bucket)
                 {
-                    foreach( var sphere in bucket ) 
-                    {
-                        //Debug.Log($"sphere({sphere.Center.x}, {sphere.Center.y}, {sphere.Center.z})");
-                        var matrix = Matrix4x4.Translate(sphere.Center) *
-                                     Matrix4x4.Scale(new Vector3(sphere.Diameter, sphere.Diameter, sphere.Diameter));
-                        try
-                        {
-                            Graphics.DrawMesh(InstanceMesh, matrix, InstanceMaterial, 0);
-                        }
-                        catch(Exception e)
-                        {
-                           Debug.Log($"Exception: {e}"); 
-                        }
-                    }
+                    matrices[idx++] = Matrix4x4.Translate(sphere.Center) *
+                                      Matrix4x4.Scale(new Vector3(sphere.Diameter, sphere.Diameter, sphere.Diameter));
+                }
+
+                try {
+                    Graphics.DrawMeshInstanced(mesh, 0, material, matrices, bucket.Count);
+                }
+                catch (Exception e) {
+                    Debug.Log($"RenderSpheresByBuckets::DrawMesh Exception: {e}");
                 }
             }
         }
@@ -331,6 +349,7 @@ namespace Spheres
                 return;
             }
 
+            UpdateBuffers();
             Graphics.DrawMeshInstancedIndirect(InstanceMesh, 0, InstanceMaterial, new UnityEngine.Bounds(Vector3.zero, new Vector3(10.0f, 10.0f, 10.0f)), _argsBuffer);
         }
 

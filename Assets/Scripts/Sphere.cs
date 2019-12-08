@@ -69,8 +69,10 @@ namespace Spheres
         public bool IsPointInside( Vector3 p ) =>
             Mathf.Pow( p.x - Center.x, 2.0f ) + Mathf.Pow( p.y - Center.y, 2.0f ) <= Radius2;
 
-        public bool IsIntersect( Sphere c ) =>
-             Distance2(c) <= Mathf.Pow( c.Radius + Radius, 2.0f );
+        public bool IsIntersect( Sphere c )
+        {
+            return Distance2( c ) <= Mathf.Pow( c.Radius + Radius, 2.0f );
+        }
 
         public bool IsIntersectTime( Sphere c, float deltaTime )
         {
