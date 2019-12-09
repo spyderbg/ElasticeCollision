@@ -1,21 +1,9 @@
-﻿using System.Collections.Generic;
-using System.Security.Cryptography.X509Certificates;
-using UnityEditor.VersionControl;
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace Spheres
 {
-    public class Sphere
+    public class Sphere : Collider
     {
-        public struct Collision
-        {
-            public float t;     // time of collision
-            public Vector3 c;   // center point in the moment of collision
-            public Vector3 p;   // position in the movement of collision
-            public Vector3 v;   // velocity after collision
-            public Sphere collider;
-        }
-
         #region Ctors
 
         public Sphere() : this( 1.0f, Vector3.zero, Vector3.zero ) {}
@@ -26,7 +14,6 @@ namespace Spheres
             Center = center;
             Radius = radius;
             Velocity = velocity;
-            Collisions = new List<Collision>();
         }
 
         #endregion
@@ -59,8 +46,6 @@ namespace Spheres
         public float Diameter => Radius * 2.0f;
 
         public Vector3 Velocity;
-
-        public List<Collision> Collisions;
 
         #endregion
 

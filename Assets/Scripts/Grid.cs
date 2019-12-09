@@ -296,7 +296,7 @@ namespace Spheres
             var si = sphere;
             var ci = si.Center;
             
-            si.Collisions.Clear();
+//            si.Collisions.Clear();
 
             ci += si.Velocity * _deltaTime;
 
@@ -506,7 +506,7 @@ namespace Spheres
                 foreach (var sphere in bucket)
                 {
                     // update velocity
-                    if(!sphere.Collisions.Any()) continue;
+//                    if(!sphere.Collisions.Any()) continue;
 
                     var s1 = sphere;
 //                    var s2 = sphere.Collisions.OrderBy(s => sphere.Distance(s)).First();
@@ -532,8 +532,8 @@ namespace Spheres
             {
                 if(!(_buckets[c] is List<Sphere> bucket)) continue;
 
-                foreach (var s in bucket)
-                    s.Collisions.Clear();
+//                foreach (var s in bucket)
+//                    s.Collisions.Clear();
                 
                 lock (bucket)
                 {

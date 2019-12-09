@@ -1,14 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
-using Microsoft.Win32.SafeHandles;
-using UnityEditor;
 using UnityEngine;
-using UnityEngine.SocialPlatforms;
-using Sphere = Spheres.Sphere;
 using Random = UnityEngine.Random;
-using Collision = Spheres.Sphere.Collision;
 
 namespace Spheres
 {
@@ -32,6 +26,7 @@ namespace Spheres
             None,
             SimpleBoundary,
             PlaneBoundary,
+            PlaneBoundaryCollision,
             SingleThread
         }
 
@@ -413,6 +408,7 @@ namespace Spheres
                 case SimulateMethods.None: break;
                 case SimulateMethods.SimpleBoundary: simulateMethod = SimulateSimpleBaundary; break;
                 case SimulateMethods.PlaneBoundary: simulateMethod = SimulatePlaneBoundary; break;
+                case SimulateMethods.PlaneBoundaryCollision: simulateMethod = SimulatePlaneBoundaryCollision; break;
                 case SimulateMethods.SingleThread: simulateMethod = SimulateSingleThread; break;
                 default:
                     throw new ArgumentOutOfRangeException( $"Simulation method not specified!!!" );
@@ -473,17 +469,17 @@ namespace Spheres
                 var vm = si.Velocity.magnitude;
 
                 var collisions = new List<Collision>();
-                var planes = new Vector4[]
+                var planes = new[]
                 {
-                    new Vector4(1.0f, 0.0f, 0.0f, 0.0f), // left
-                    new Vector4(-1.0f, 0.0f, 0.0f, _grid.Width), // right
-                    new Vector4(0.0f, -1.0f, 0.0f, _grid.Height), // top
-                    new Vector4(0.0f, 1.0f, 0.0f, 0.0f) // bottom
+                    new Plane(1.0f, 0.0f, 0.0f, 0.0f), // left
+                    new Plane(-1.0f, 0.0f, 0.0f, _grid.Width), // right
+                    new Plane(0.0f, -1.0f, 0.0f, _grid.Height), // top
+                    new Plane(0.0f, 1.0f, 0.0f, 0.0f) // bottom
                 };
 
                 foreach (var plane in planes)
                 {
-                    var lprim = plane - new Vector4(0.0f, 0.0f, 0.0f, si.Radius);
+                    var lprim = new Vector4(plane.Normal.x, plane.Normal.y, plane.Normal.z, plane.Distance - si.Radius);
                     var lcDot = Vector4.Dot(lprim, new Vector4(ci.x, ci.y, ci.z, 1.0f));
                     var lvDot = Vector4.Dot(lprim, new Vector4(vi.x, vi.y, vi.z, 0.0f));
                     if (Math.Abs(lvDot) < float.Epsilon) continue;
@@ -491,7 +487,7 @@ namespace Spheres
                     var t = -(lcDot / lvDot);
                     if( t <= .0f || 1.0f <= t) continue;
 
-                    var n = new Vector3(plane.x, plane.y, plane.z).normalized;
+                    var n = plane.Normal.normalized;
                     var r = vi - 2 * Vector3.Dot(vi, n) * n;
                     collisions.Add(new Collision()
                     {
@@ -516,8 +512,70 @@ namespace Spheres
             }
         }
 
+        private void SimulatePlaneBoundaryCollision( float deltaTime )
+        {
+            // calculate collisions
+            var collisions = new List<Collision>();
+
+            foreach( Sphere si in _grid.Spheres )
+            {
+                var ci = si.Center;
+                var vi = si.Velocity * deltaTime;
+
+                var planes = new[]
+                {
+                    new Plane(1.0f, 0.0f, 0.0f, 0.0f), // left
+                    new Plane(-1.0f, 0.0f, 0.0f, _grid.Width), // right
+                    new Plane(0.0f, -1.0f, 0.0f, _grid.Height), // top
+                    new Plane(0.0f, 1.0f, 0.0f, 0.0f) // bottom
+                };
+
+                foreach (var plane in planes)
+                {
+                    var lprim = new Vector4(plane.Normal.x, plane.Normal.y, plane.Normal.z, plane.Distance - si.Radius);
+                    var lcDot = Vector4.Dot(lprim, new Vector4(ci.x, ci.y, ci.z, 1.0f));
+                    var lvDot = Vector4.Dot(lprim, new Vector4(vi.x, vi.y, vi.z, 0.0f));
+                    if (Math.Abs(lvDot) < float.Epsilon) continue;
+
+                    var t = -(lcDot / lvDot);
+                    if(t <= .0f || 1.0f <= t) {
+                        ci += vi;
+                    } else {
+                        var n = plane.Normal.normalized;
+                        var r = vi - 2 * Vector3.Dot(vi, n) * n;
+
+                        collisions.Add(new Collision()
+                        {
+                            t = t,
+                            p = ci + t * vi,
+                            c = ci + t * vi - si.Radius * new Vector3(lprim.x, lprim.y, lprim.z),
+                            v = r * (1 - t),
+                            collider1 = si,
+                            collider2 = plane
+                        });
+                    }
+                }
+
+                si.Center = ci;
+            }
+
+            // response to collisions
+            foreach(var col in collisions.OrderBy(c => c.t))
+            {
+                var si = ((Sphere) col.collider1);
+                var ci = col.p; //si.Center + col.t * si.Velocity * deltaTime;
+                var vi = col.v;
+                if ((Math.Abs(vi.magnitude) > float.Epsilon))
+                    si.Velocity = vi.normalized * si.Velocity.magnitude;
+                si.Center = ci;
+            }
+        }
+
         private void SimulateSingleThread( float deltaTime )
         {
+            // find all collisions
+            var collisions = new List<Collision>();
+
             foreach( Sphere si in _grid.Spheres )
             {
                 var ci = si.Center;
@@ -532,7 +590,6 @@ namespace Spheres
                     new Vector4(0.0f, 1.0f, 0.0f, 0.0f) // bottom
                 };
 
-                si.Collisions.Clear();
                 // collide with borders
                 foreach (var plane in planes)
                 {
@@ -546,7 +603,7 @@ namespace Spheres
 
                     var n = new Vector3(plane.x, plane.y, plane.z).normalized;
                     var r = vi - 2 * Vector3.Dot(vi, n) * n;
-                    si.Collisions.Add(new Collision()
+                    collisions.Add(new Collision()
                     {
                         t = t,
                         p = ci + t * vi,
@@ -589,13 +646,13 @@ namespace Spheres
                     var dot = Vector3.Dot(vi - vj, n);
                     var k = 2.0f * dot / (si.Radius + sj.Radius);
 
-                    si.Collisions.Add(new Collision()
+                    collisions.Add(new Collision()
                     {
                         t = t,
                         p = cj + t * vi,
                         c = cj, // incorrect
                         v = vj + k * si.Radius * n,
-                        collider = sj
+                        collider1 = sj
                     });
                 }
             }
@@ -605,9 +662,9 @@ namespace Spheres
                 var ci = si.Center;
                 var vi = si.Velocity * deltaTime;
                 var vim = si.Velocity.magnitude;
-                var col = si.Collisions.OrderBy( c => c.t ).ElementAt( 0 );
+                var col = collisions.OrderBy( c => c.t ).ElementAt( 0 );
 
-                if( si.Collisions.Any() )
+                if( collisions.Any() )
                 {
                     ci = col.p;
                     vi = col.v;
