@@ -13,6 +13,7 @@ public class SceneGUI : Editor
         Handles.BeginGUI();
 
         var field = FindObjectOfType<Field>();
+        var grid = field.transform.GetComponentInChildren<Grid>(true);
 
         // Randomize button
         if (GUI.Button( new Rect(10.0f, 10.0f, 100.0f, 50.0f), "Randomize"))
@@ -27,7 +28,6 @@ public class SceneGUI : Editor
         {
             _isGridVisible = !_isGridVisible;
 
-            var grid = field.transform.GetComponentInChildren<Grid>(true);
             grid.gameObject.SetActive( _isGridVisible );
         }
 
@@ -41,7 +41,16 @@ public class SceneGUI : Editor
 //            field.SyncWithVisualSpheres();
         }
 
-        field.Speed = GUI.HorizontalSlider(new Rect(20.0f, 70.0f, 100.0f, 40.0f), field.Speed, 0.1f, 5.0f );
+        field.Speed = GUI.HorizontalSlider(new Rect(20.0f, 70.0f, 100.0f, 40.0f), field.Speed, 0.1f, 10.0f );
+
+        // stats
+        GUI.color = Color.white;
+        var rect = new Rect(340.0f, 70.0f, 300.0f, 20.0f);
+        foreach(Sphere si in grid.Spheres)
+        {
+//            GUI.Label( rect, $"p:{si.Center} v:{si.Velocity} r:({si.Radius})" );
+            rect.y += 18.0f;
+        }
 
         Handles.EndGUI();
     }

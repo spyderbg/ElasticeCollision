@@ -77,7 +77,9 @@ namespace Spheres
             }
             
             // update field for 'dt'
-            Simulate(Speed * Time.deltaTime);
+            for(var i = 0; i < Speed; i++)
+                Simulate(Mathf.Clamp(0.0f, 1.0f, Speed - i) * Time.deltaTime);
+
             RenderSpheres();
         }
 
@@ -519,6 +521,7 @@ namespace Spheres
 
             foreach( Sphere si in _grid.Spheres )
             {
+                var hasCollision = false;
                 var ci = si.Center;
                 var vi = si.Velocity * deltaTime;
 
@@ -538,23 +541,21 @@ namespace Spheres
                     if (Math.Abs(lvDot) < float.Epsilon) continue;
 
                     var t = -(lcDot / lvDot);
-                    if(t <= .0f || 1.0f <= t) {
-                        ci += vi;
-                    } else {
-                        var n = plane.Normal.normalized;
-                        var r = vi - 2 * Vector3.Dot(vi, n) * n;
+                    if(t <= .0f || 1.0f < t) continue;
 
-                        collisions.Add(new Collision()
-                        {
-                            t = t,
-                            p = ci + t * vi,
-                            c = ci + t * vi - si.Radius * new Vector3(lprim.x, lprim.y, lprim.z),
-                            v = r * (1 - t),
-                            collider1 = si,
-                            collider2 = plane
-                        });
-                    }
+                    hasCollision = true;
+                    collisions.Add(new Collision()
+                    {
+                        t = t,
+                        p = ci + t * vi,
+                        c = ci + t * vi - si.Radius * new Vector3(lprim.x, lprim.y, lprim.z),
+                        sphere = si,
+                        plane = plane
+                    });
                 }
+
+                if(!hasCollision)
+                    ci += vi; 
 
                 si.Center = ci;
             }
@@ -562,12 +563,10 @@ namespace Spheres
             // response to collisions
             foreach(var col in collisions.OrderBy(c => c.t))
             {
-                var si = ((Sphere) col.collider1);
-                var ci = col.p; //si.Center + col.t * si.Velocity * deltaTime;
-                var vi = col.v;
-                if ((Math.Abs(vi.magnitude) > float.Epsilon))
-                    si.Velocity = vi.normalized * si.Velocity.magnitude;
-                si.Center = ci;
+                if(col.sphere == null || col.plane == null) continue; 
+
+                col.sphere.Velocity = col.plane.Reflect( col.sphere.Velocity );
+                col.sphere.Center = col.p;
             }
         }
 
@@ -652,7 +651,7 @@ namespace Spheres
                         p = cj + t * vi,
                         c = cj, // incorrect
                         v = vj + k * si.Radius * n,
-                        collider1 = sj
+                        sphere = sj
                     });
                 }
             }
