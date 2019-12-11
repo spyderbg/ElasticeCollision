@@ -30,6 +30,8 @@ namespace Spheres
             }
         }
 
+        public Vector3 NormalNorm => _normalNorm;
+
         public float Distance
         {
             get => _distance;

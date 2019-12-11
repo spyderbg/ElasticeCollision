@@ -46,8 +46,8 @@ public class SceneGUI : Editor
         field.Speed = GUI.HorizontalSlider(new Rect(20.0f, 70.0f, 100.0f, 40.0f), field.Speed, 0.1f, 10.0f );
 
         // stats
-        var statX = 340.0f;
-        var statY = 70.0f;
+        var statX = 550.0f;
+        var statY = 10.0f;
         var statW = 300.0f;
         var statLine = 18.0f;
 
@@ -63,12 +63,12 @@ public class SceneGUI : Editor
 
         GUI.color = Color.white;
 
-//        GUI.Box( new Rect(statX, statY, statW, rect.y + statLine - statY ), "Positions:", _statBgrStyle );
+        GUI.Box( new Rect(statX, statY, statW, rect.y + statLine - statY ), "Positions:", _statBgrStyle );
 
         rect = new Rect(statX, statY + statLine, statW, statLine);
         foreach(Sphere si in grid.Spheres)
         {
-//            GUI.Label( rect, $"p:{si.Center} v:{si.Velocity} r:({si.Radius})" );
+            GUI.Label( rect, $"p:{si.Center} v:{si.Velocity} r:({si.Radius})" );
             rect.y += statLine - 2.0f;
         }
 

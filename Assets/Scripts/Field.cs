@@ -637,37 +637,42 @@ namespace Spheres
                     if( si == sj ) continue;
 
                     // find time of collision
-                    var a = ci - cj;
-                    var a2 = a.x * a.x + a.y * a.y;
-                    var b = vi - vj;
-                    var b2 = b.x * b.x + b.y * b.y;
-                    var ab = Vector3.Dot( a, b );
-                    var ab2 = ab * ab;
-                    var d2 = a2 - ab2 / b2;
-                    var dist = si.Radius + sj.Radius;
-                    var dist2 = dist * dist;
+//                    var a = ci - cj;
+//                    var a2 = Vector3.Dot(a, a);
+//                    var b = vi - vj;
+//                    var b2 = Vector3.Dot(b, b);
+//                    var ab = Vector3.Dot(a, b);
+//                    var ab2 = ab * ab;
+//                    var d2 = a2 - ab2 / b2;
+                    var minDist = si.Radius + sj.Radius;
+                    var dist = si.Distance( sj );
 
-//                    if( d2 > dist2 ) continue;
+                    if(dist > minDist) continue;
 
-                    var t = 0.5f;
-//                    var t = -0.5f;//(-ab - Mathf.Sqrt(ab2 - b2 * (a2 - d2))) / b2;
+                    // add collision
+//                    var t = 0.5f;
+//                    var t = (-ab - Mathf.Sqrt(ab2 - b2 * (a2 - d2))) / b2;
 
 //                    if( t <= .0f || 1.0f <= t) continue;
 
-                    if(!si.IsIntersect( sj )) continue;
+//                    if(!si.IsIntersect( sj )) continue;
 
+//                    var pnDot = Vector3.Dot(col.p, col.plane.Normal);
+                    
+                    var overlap = 0.5f * (dist - minDist) / dist;
+                    //
                     hasCollision = true;
                     collisions.Add(si, new Collision()
                     {
-                        t = t,
-                        p = ci,// + t * vi,
+                        t = 0.0f,
+                        p = ci - overlap * (ci - cj),
                         sphere = si,
                         plane = new Plane((ci - cj).normalized)
                     });
                     collisions.Add(sj, new Collision()
                     {
-                        t = t,
-                        p = cj,// + t * vj,
+                        t = 0.0f,
+                        p = cj - overlap * (cj - ci),
                         sphere = sj,
                         plane = new Plane((cj - ci).normalized)
                     });
@@ -683,10 +688,10 @@ namespace Spheres
             foreach(var si in collisions.Keys)
             {
                 var col = collisions.GetValues( si, false )?.OrderBy(c => c.t ).FirstOrDefault();
-                if(col == null || col.sphere == null || col.plane == null) continue; 
+                if(col?.sphere == null || col.plane == null) continue; 
 
                 col.sphere.Velocity = col.plane.Reflect( col.sphere.Velocity );
-                col.sphere.Center = col.p;
+                col.sphere.Center = col.p + (1.0f - col.t) * col.sphere.Velocity * deltaTime;
             }
         }
 
