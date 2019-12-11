@@ -2,11 +2,13 @@
 using UnityEditor;
 using UnityEngine;
 using Grid = Spheres.Grid;
+using Plane = Spheres.Plane;
 
 [CustomEditor(typeof(Field))]
 public class SceneGUI : Editor
 {
     private static bool _isGridVisible = true;
+    private GUIStyle _statBgrStyle = null;
 
     public void OnSceneGUI()
     {
@@ -44,15 +46,45 @@ public class SceneGUI : Editor
         field.Speed = GUI.HorizontalSlider(new Rect(20.0f, 70.0f, 100.0f, 40.0f), field.Speed, 0.1f, 10.0f );
 
         // stats
+        var statX = 340.0f;
+        var statY = 70.0f;
+        var statW = 300.0f;
+        var statLine = 18.0f;
+
+        if(_statBgrStyle == null)
+        {
+            _statBgrStyle = new GUIStyle();
+            _statBgrStyle.normal.background = MakeTexture(2, 2, new Color(0.1f, 0.1f, 0.1f, 0.9f));
+        }
+
+        var rect = new Rect(statX, statY + statLine, statW, statLine);
+        foreach(Sphere si in grid.Spheres)
+            rect.y += statLine - 2.0f;
+
         GUI.color = Color.white;
-        var rect = new Rect(340.0f, 70.0f, 300.0f, 20.0f);
+
+//        GUI.Box( new Rect(statX, statY, statW, rect.y + statLine - statY ), "Positions:", _statBgrStyle );
+
+        rect = new Rect(statX, statY + statLine, statW, statLine);
         foreach(Sphere si in grid.Spheres)
         {
 //            GUI.Label( rect, $"p:{si.Center} v:{si.Velocity} r:({si.Radius})" );
-            rect.y += 18.0f;
+            rect.y += statLine - 2.0f;
         }
 
         Handles.EndGUI();
+    }
+
+    private Texture2D MakeTexture( int w, int h, Color color )
+    {
+        var pix = new Color[w * h];
+        for(int i = 0; i < pix.Length; i++)
+            pix[i] = color;
+
+        var tex = new Texture2D(w, h);
+        tex.SetPixels( pix );
+        tex.Apply();
+        return tex;
     }
 
 }

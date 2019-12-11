@@ -14,6 +14,12 @@ namespace Spheres
             _distance = d;
         }
 
+        public Plane( Vector3 v )
+        {
+            Normal = new Vector3(v.x, v.y, v.z);
+            _distance = 0.0f;
+        }
+
         public Vector3 Normal
         {
             get => _normal;
